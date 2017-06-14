@@ -45,7 +45,11 @@ If RUN_TESTS is TRUE, the system checks where trip occur more than twice and the
 
 Next the locations are clustered based on a combination of DBSCAN and network connection analysis, which means, that distance checks are only performed on locations which are connected through trips. The resulting clusters are stored in an additional table.
 
+![Location cluster test](https://github.com/sebastian-meier/moves-to-spatialite/blob/master/thumb_cluster.png?raw=true)
+
 Based on the trajectories between locations and between clusters, the system builds so called corridors which are basically merged trajectories with a buffer and a hull.
+
+![Corridor test](https://github.com/sebastian-meier/moves-to-spatialite/blob/master/thumb_corridors.png?raw=true)
 
 The location metadata is extended through a network analysis making use of:
 - ngraph.centrality
