@@ -61,6 +61,8 @@ Several geojsons are automatically generated:
 
 If RUN\_TESTS is TRUE, a prediction test is run based on the corridors and the selected test trips. The test consists of 3 steps. The test trip is broken down into smaller segments. Then the 1, 1+2, 1+2+3, 1+n segments are intersected with the corridors. For the resulting corridors the temporal information is retrieved which is then fed into an KNN algorithm, which tries to predict the most likely corridor. The results are stored in knn\_test\_results.json
 
+I haven created a full config, as this was part of a larger test, but i tried highlighting all point where adjustments can be made through the word **ADJUST** in the comments.
+
 ## DB Query
 
 As mentioned above, the resulting SQLite database is saved in a DB file. If you quickly want to extract something. You can use query.js, its pretty straight forward:

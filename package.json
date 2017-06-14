@@ -7,7 +7,7 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "node index.js"
+    "test": "node index.js tests/fixtures/test.geojson test_output TRUE"
   },
   "repository": {
     "type": "git",

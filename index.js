@@ -298,6 +298,11 @@ function loadData(){
     console.log('parse_start',dev_diff())
     geojson = JSON.parse(data)
 
+    /*
+    ADJUST
+
+    distance between location to be counted as the same location (50)
+    */
     //First loop through the file and extract all locations
     let locations_keys = {}, location_merge_keys = {}, min_dist = 50
 
@@ -810,7 +815,15 @@ function buildCorridors(){
       groups[group_keys[id]].connections.push(mls)
     }
 
-    let buffer = 0.300, overlap = 0.6, min_cluster = 0
+    /*
+    ADJUST
+
+    buffer for trajectories
+    overlap to be accounted for a common trajectory (in %)
+    minimum of n cluster to be counted as a corridor
+    */
+
+    let buffer = 0.300, overlap = 0.6, min_cluster = 1
 
     let cluster_groups = []
 
@@ -938,7 +951,12 @@ function insert_corridors(corridors, i){
   })
 }
 
-let cluster_dist = 0.5
+/*
+ADJUST
+
+distance between locations
+*/
+let cluster_dist = 0.7
 
 function build_location_clusters(){
   db.all('SELECT from_id, to_id FROM trips GROUP BY from_id, to_id', function(err, rows){
@@ -1093,7 +1111,7 @@ function insert_location_clusters(clusters, i){
             if(corr_test){
               setup_corr_test()
             }else{
-              finish()
+              networkAnalysis()
             }
           })
         }
@@ -1238,6 +1256,11 @@ function execute_corr_test(){
     //"(Area(ST_Transform(Intersection(ST_Transform(Buffer(ST_Transform(GeomFromText('LINESTRING("+lineToText(linestring)+")' ,4326), 3857), 300), 4326), corridors.the_geom), 3857)) / Area(Buffer(ST_Transform(GeomFromText('LINESTRING("+lineToText(linestring)+")' ,4326), 3857), 300))) > 0.6 " +
     //Not enough overlaps
     "Intersects(temp_query.the_geom, corridors.the_geom) AND "+
+/*
+ADJUST
+
+percentage of overlap to be counted as match
+*/
     " (inter_area / trip_area) > 0.7 "+ //0.7?
     "GROUP BY "+
     "temp_query.id, corridors.id "+
