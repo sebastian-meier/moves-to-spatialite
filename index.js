@@ -661,7 +661,7 @@ let locations_keys = {}, test_corrs = {}, test_corrs_limit = 2
 function insertLocation(i){
   //Insert all locations and location event into the database and create a new array including the unique database IDs
 
-  db.run("INSERT INTO locations (name, type, transit, destination, the_geom, fs_id) VALUES ('"+locations[i].name+"', '"+locations[i].type+"', "+locations[i].transit+", "+locations[i].destination+", GeomFromText('POINT("+locations[i].lon+" "+locations[i].lat+")', 4326),'"+locations[i].fs_id+"')", function(err){
+  db.run("INSERT INTO locations (name, type, transit, destination, the_geom, fs_id) VALUES (?,?, "+locations[i].transit+", "+locations[i].destination+", GeomFromText('POINT("+locations[i].lon+" "+locations[i].lat+")', 4326),?)", [locations[i].name, locations[i].type,locations[i].fs_id], function(err){
     if(err) console.log(err);
     var loc_id = this.lastID
 
