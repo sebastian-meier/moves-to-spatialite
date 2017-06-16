@@ -294,6 +294,9 @@ function loadData(){
   fs.readFile(file, 'utf8', function (err,data) {
     if (err) { return console.log(err); }
 
+    data = data.split('[,{').join('[{');
+    data = data.split('},]').join('}]');
+
     console.log('load_done',dev_diff())
     console.log('parse_start',dev_diff())
     geojson = JSON.parse(data)
@@ -307,7 +310,7 @@ function loadData(){
     let locations_keys = {}, location_merge_keys = {}, min_dist = 50
 
     //sometimes an location event is broken up into multiple pieces, this first loop stitches them back together
-    let i = 0
+    i = 0
     while(i<geojson.features.length){
       if(i<(geojson.features.length-1)){
         if(geojson.features[i].properties.type == 'place' && geojson.features[i+1].properties.type == 'place'){
@@ -328,6 +331,17 @@ function loadData(){
       }
       i++
     }
+
+    geojson.features.forEach(f=>{
+      if(f.properties.type == 'move'){
+        for(let i = 0; i<f.geometry.coordinates.length; i++){
+          if(f.geometry.coordinates[i].length == 0){
+            f.geometry.coordinates.splice(i,1)
+            f.properties.activities.splice(i,1)
+          }
+        }
+      }
+    })
 
     //collecting training data
     geojson.features.forEach( feature => {
@@ -833,40 +847,78 @@ function buildCorridors(){
         let clusters = [[g.connections[0]]]
         g.connections.splice(0,1)
         while(g.connections.length>=1){
-          let matches = []
-          let buffer_1 = turf.buffer(g.connections[0], buffer, 'kilometers'),
+          let matches = [], poly_cool = true, buffer_1, area_1
+          try{
+            buffer_1 = turf.buffer(g.connections[0], buffer, 'kilometers')
             area_1 = turf.area(buffer_1)
-          for(let i = 0; i<clusters.length; i++){
-            let intersect = false
-            for(let j = 0; j<clusters[i].length; j++){
-              let buffer_2 = turf.buffer(clusters[i][j], buffer, 'kilometers')
-              
-              let intersection = false
-              try{
-                //if polygons are too identical turf sometimes throws an error, for some reason adding a simplify to the loop fixes things...
-                intersection = turf.intersect(buffer_1, buffer_2)
-              }catch(err){
-                buffer_1 = turf.simplify(buffer_1, 0.00001)
-                buffer_2 = turf.simplify(buffer_2, 0.00001)
+          }catch(err){
+            try{
+              buffer_1 = turf.buffer(turf.simplify(g.connections[0], 0.00001), buffer, 'kilometers')
+              area_1 = turf.area(buffer_1)
+            }catch(err){
+              poly_cool = false
+            }
+          }
+          if(poly_cool){
+            for(let i = 0; i<clusters.length; i++){
+              let intersect = false
+              for(let j = 0; j<clusters[i].length; j++){
+                let buffer_2
                 try{
-                  intersection = turf.intersect(buffer_1, buffer_2)
+                  buffer_2 = turf.buffer(clusters[i][j], buffer, 'kilometers')
                 }catch(err){
-                  console.log('these two polygons don\'t like each other:')
-                  console.log(JSON.stringify(buffer_1)+","+JSON.stringify(buffer_2))
+                  poly_cool = false
                 }
-              }
+                let intersection = false
+                if(poly_cool){
+                  try{
+                    //if polygons are too identical turf sometimes throws an error, for some reason adding a simplify to the loop fixes things...
+                    intersection = turf.intersect(buffer_1, buffer_2)
+                  }catch(err){
+                    buffer_1 = turf.simplify(buffer_1, 0.00001)
+                    buffer_2 = turf.simplify(buffer_2, 0.00001)
 
-              if(intersection){
-                let area_2 = turf.area(buffer_2),
-                  intersect_area = turf.area(intersection)
-                if(intersect_area / area_2 > overlap && intersect_area / area_1 > overlap ){
-                  intersect = true
+                    let bb1 = turf.bbox(buffer_1),
+                      bb2 = turf.bbox(buffer_2),
+                      bbidentical = true
+
+                    bb1.forEach((bb1p,bb1pi)=>{
+                      if(Math.abs(bb1p - bb2[bb1pi]) > 0.00000000001){
+                        bbidentical = false
+                      }
+                    })
+                    if(bbidentical){
+                      intersection = buffer_1
+                    }else{
+                      try{
+                        intersection = turf.intersect(buffer_1, buffer_2)
+                      }catch(err){
+                        console.log('these two polygons don\'t like each other:')
+                        console.log(JSON.stringify(buffer_1)+","+JSON.stringify(buffer_2))
+                      }
+                    }
+                  }
+                }
+
+                if(intersection){
+                  try{
+                    let area_2 = turf.area(buffer_2),
+                      intersect_area = turf.area(intersection)
+                    if(intersect_area / area_2 > overlap && intersect_area / area_1 > overlap ){
+                      intersect = true
+                    }
+                  }catch(err){
+                    //intersect does not work
+                    console.log('buggy polygon')
+                  }
                 }
               }
+              if(intersect){
+                matches.push(i)
+              }
             }
-            if(intersect){
-              matches.push(i)
-            }
+          }else{
+            //something is wrong with this polygon (or at least turf does not like it)
           }
           if(matches.length === 1){
             clusters[matches[0]].push(g.connections[0])
@@ -899,14 +951,26 @@ function buildCorridors(){
         buffers = [], trips = []
         c.forEach(l => {
           trips.push(l.properties.id)
-          buffers.push(turf.buffer(l, buffer, 'kilometers'))
+          try{
+            buffers.push(turf.buffer(l, buffer, 'kilometers'))
+          }catch(err){
+            buffers.push(turf.buffer(turf.simplify(l,0.00001), buffer, 'kilometers'))
+          }
         })
         for(let b = 1; b<buffers.length; b++){
           try{
             buffers[0] = turf.union(buffers[0],buffers[b])
           }catch(err){
             buffers[b] = turf.simplify(buffers[b], 0.00001)
-            buffers[0] = turf.union(buffers[0],buffers[b])
+            try{
+              buffers[0] = turf.union(buffers[0],buffers[b])
+            }catch(err){
+              try{
+                buffers[0] = turf.union(turf.simplify(buffers[0], 0.00001),buffers[b])
+              }catch(err){
+                console.log('missed one merge')
+              }
+            }
           }
         }
         buffers[0] = turf.simplify(buffers[0], 0.0001, true)
